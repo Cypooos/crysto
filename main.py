@@ -1,33 +1,37 @@
 import builtins
 
+import core.com.log as log_
+log = log_.Log()
+builtins.log = log
+
 import sys, os
 import shlex
-import core.com.log as log
 
 from time import gmtime, strftime
 import asyncio, discord
 
 client = discord.Client()
 
+conf = {
+    "logChannel":682643807359205389,
+    "START_CHAR": '!',
+    "deleteWarnTime":30,
+}
+
+builtins.conf = conf
+builtins.client = client
+
 from core import security
 security = security.Security(client)
+builtins.security = security
 
 from core import DiscordCommandLineGenerator
 commandLine = DiscordCommandLineGenerator.CommandLine(client,security)
-
-conf = {
-    "logChannel":682643807359205389,
-    "START_CHAR": '!'
-}
-
-import core.com.log as log_
-log = log_.Log()
-builtins.log = log
-builtins.conf = conf
-builtins.client = client
-builtins.security = security
 builtins.commandLine = commandLine
 
+from core.EnigmesManager import EnigmesManager
+main = EnigmesManager("core/databases/Enigmes.csv","core/databases/Users.csv")
+builtins.main = main
 
 # importing commands in orders
 import core.commands.cmd_Enigmes # the Enigmes interface
@@ -42,7 +46,15 @@ async def on_message(message):
 
   if len(message.content)>2 and message.content[0] == conf["START_CHAR"]:
     message.content = message.content[1:]
+    message.author = log.channel.guild.get_member(message.author.id) # adding the server context, so PM still have "roles"
+    
+    for x in main.users.keys():
+      message.content = message.content.replace("<@"+str(x)+">",str(x)).replace("<@!"+str(x)+">",str(x))
+      usr = await client.fetch_user(int(x))
+      message.content = message.content.replace("#"+usr.name,str(x))
     if not await security.checkCommand(message):return # SECURITY
+    message.content = message.content.replace("\\n","\n")
+    print(message.content)
     ret = await commandLine.execute(message)
     if ret != None and ret != "": await message.channel.send(ret)
   

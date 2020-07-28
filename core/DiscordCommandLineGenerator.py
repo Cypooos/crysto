@@ -3,6 +3,14 @@ import sys
 import asyncio
 import discord 
 
+
+async def delete(messages,time=0):
+  await asyncio.sleep(time)
+  for message in messages:
+    try:await message.delete()
+    except discord.errors.NotFound:continue
+    except discord.errors.Forbidden:continue
+
 # La classe de la ligne de commande
 class CommandLine():
 
@@ -39,15 +47,15 @@ class CommandLine():
             param = " ".join(list(arg)[i:])
             new_args.append(param)
             break
-          try:
-            param = arg[i]
-          except:
-            if isinstance(annot,tuple):
-              try:
-                if not isinstance(annot[0],arg[i]): param = annot[0]
-                else:param = annot[1]
-              except IndexError: param = annot[1]
-            else: raise AssertionError(self.__msgArguments)
+          if isinstance(annot,tuple):
+            try:
+              param = annot[0](arg[i])
+            except ValueError:param = annot[1]
+            except IndexError: param = annot[1]
+          else:
+            try: 
+              param = arg[i]
+            except:raise AssertionError(self.__msgArguments)
           if annot == "return": pass
           elif annot == None:
             pass
@@ -89,12 +97,14 @@ class CommandLine():
     for commande in commandes:
       trt_commande = commande.split(" ")
       self.cmdReturn = await self.__command(trt_commande,message)
+    asyncio.get_running_loop().run_in_executor(None, await delete([self.message])) # delete message
     if self.cmdReturn != None: return self.cmdReturn
 
 
   # executer une commande
   async def __command(self,execute,message):
     if isinstance(execute,str):execute = execute.split(" ") # if argument not in list, conversion to list
+    execute = [x.replace("_"," ") for x in execute]
 
     if execute == []: return None # is command is empty
     returning = None 
@@ -102,7 +112,7 @@ class CommandLine():
     for funct in self.funct: # for every command register
       if funct.__name__.split(" ")[0] == execute[0]: # Found the command
 
-        if not self.SECURITY.canExecute(funct, message.author):await self.SECURITY.send_warn("TUTUTUTU","You can't use this command.\n **Sorry !**",message);return
+        if not self.SECURITY.canExecute(funct, message.author):await self.SECURITY.send_warn("Pas le bon role","You can't use this command.\n **Sorry !**",message);return
 
         try:
           if funct.caller: # Call the function w/ the caller
@@ -113,7 +123,6 @@ class CommandLine():
           returning = "Erreur d'argument:\n"+str(err)
         finally:
           find = True # we found the function
-    
     if not find: # if we havn't find the function
       returning = self.__msgUnknow # echoing the error message
     return returning
